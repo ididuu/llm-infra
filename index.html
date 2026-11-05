@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en"><head><meta name="robots" content="noindex">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LLM Infra Notes</title>
+<meta name="description" content="Practical notes on running LLMs on rented GPUs: VRAM sizing, batching, vector stores, and what actually breaks in production.">
+<link rel="canonical" href="https://llm-infra.pages.dev/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="LLM Infra Notes">
+<meta property="og:description" content="Practical notes on running LLMs on rented GPUs: VRAM sizing, batching, vector stores, and what actually breaks in production.">
+<meta property="og:url" content="https://llm-infra.pages.dev/">
+<meta name="twitter:card" content="summary">
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "name": "LLM Infra Notes", "url": "https://llm-infra.pages.dev/", "description": "Practical notes on running LLMs on rented GPUs: VRAM sizing, batching, vector stores, and what actually breaks in production.", "inLanguage": "en"}, {"@type": "ItemList", "name": "LLM Infra Notes · 全部文章", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "RAG: Should the Vector Store Live on the Model Host?", "url": "https://llm-infra.pages.dev/p/rag-vector-store-same-host-or-separate.html"}, {"@type": "ListItem", "position": 2, "name": "How Much VRAM Does an LLM Actually Need?", "url": "https://llm-infra.pages.dev/p/how-much-vram-does-an-llm-need.html"}, {"@type": "ListItem", "position": 3, "name": "Why Your GPU Sits at 30% While Serving Requests", "url": "https://llm-infra.pages.dev/p/gpu-utilization-low-while-serving.html"}]}]}</script>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:16px/1.75 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",
+ "Microsoft YaHei",sans-serif;color:#1a1d23;background:#fbfbfc;
+ max-width:clamp(880px,88vw,1080px);margin:0 auto;padding:0 20px 56px;
+ -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+header{padding:64px 0 10px}
+h1{font-size:2.05rem;line-height:1.26;letter-spacing:-.022em;font-weight:700}
+.tag{color:#4a5160;font-size:1.06rem;margin-top:14px;max-width:42em;line-height:1.72}
+.meta{color:#8a919e;font-size:.84rem;margin-top:18px}
+.meta b{color:#1a1d23;font-weight:600}
+hr{border:0;border-top:1px solid #e8eaee;margin:36px 0 6px}
+.grp{margin-top:34px}
+.grp h2{font-size:.94rem;font-weight:600;color:#6b7280;
+ display:flex;align-items:baseline;gap:10px;margin-bottom:14px;letter-spacing:.02em}
+.grp h2 .n{font-size:.72rem;font-weight:500;color:#9aa1ad;
+ background:#f1f3f6;border-radius:99px;padding:2px 8px}
+ul{list-style:none;display:grid;gap:12px}
+@media(min-width:640px){ul{grid-template-columns:1fr 1fr}}
+li{background:#fff;border:1px solid #e8eaee;border-radius:14px;
+ padding:18px 20px;transition:border-color .18s,box-shadow .18s,transform .18s}
+li:hover{border-color:#d5dae2;box-shadow:0 4px 18px rgba(20,25,40,.06);
+ transform:translateY(-1px)}
+/* 卡片标题用墨色而不是 accent：整页十几条红色标题会变成"链接列表"，
+   而内容站要的是"一叠文章"。accent 留给 hover 与统计数字。 */
+li a{color:#14181f;font-weight:600;text-decoration:none;font-size:1rem;
+ line-height:1.5;display:block;letter-spacing:-.008em}
+li:hover a{color:#c8342c;text-decoration:underline}
+li .sub{display:block;color:#6b7280;font-size:.84rem;line-height:1.62;
+ margin-top:7px;font-weight:400}
+footer{margin-top:52px;padding-top:18px;border-top:1px solid #e8eaee;
+ color:#8a919e;font-size:.8rem;line-height:1.7}
+footer .disc{color:#6b7280}
+</style></head><body>
+<header>
+<h1>LLM Infra Notes</h1>
+<p class="tag">Practical notes on running LLMs on rented GPUs: VRAM sizing, batching, vector stores, and what actually breaks in production.</p>
+<p class="meta">共 <b>3</b> 篇 · 按主题整理 · 更新于 2026-11-05</p>
+</header>
+<hr>
+<main>
+<section class="grp"><h2>Architecture<span class="n">1</span></h2><ul><li><a href="./p/rag-vector-store-same-host-or-separate.html">RAG: Should the Vector Store Live on the Model Host?</a><span class="sub">The decision is about RAM, not VRAM — and the two failure modes look identical from the outside</span></li></ul></section><section class="grp"><h2>Sizing<span class="n">1</span></h2><ul><li><a href="./p/how-much-vram-does-an-llm-need.html">How Much VRAM Does an LLM Actually Need?</a><span class="sub">A sizing method you can recompute for any model — and the reason your weights are usually not what ran out of memory</span></li></ul></section><section class="grp"><h2>Throughput<span class="n">1</span></h2><ul><li><a href="./p/gpu-utilization-low-while-serving.html">Why Your GPU Sits at 30% While Serving Requests</a><span class="sub">Low utilisation is usually an unbatched workload, not an underpowered card</span></li></ul></section>
+</main>
+<footer>
+<p class="disc">披露：本站部分链接为合作链接，通过这些链接成交后本站可能获得佣金，不影响你的购买价格。</p>
+<p>本页整理自公开资料，产品规格与价格以官方页面为准。</p>
+</footer>
+</body></html>

@@ -1,0 +1,11 @@
+# LLM Infra Notes
+
+> Practical notes on running LLMs on rented GPUs: VRAM sizing, batching, vector stores, and what actually breaks in production.
+
+## Pages
+
+- [Why Your GPU Sits at 30% While Serving Requests](https://llm-infra.pages.dev/p/gpu-utilization-low-while-serving): Generation is memory-bandwidth bound, not compute bound. One request at a time leaves most of the card idle, and batching fixes that without buying hardware.
+- [How Much VRAM Does an LLM Actually Need?](https://llm-infra.pages.dev/p/how-much-vram-does-an-llm-need): A 7B model takes about 14 GB of FP16 weights, but 8K context at batch 8 needs about 30 GB of KV cache. Size the cache first, then precision, then the card.
+- [RAG: Should the Vector Store Live on the Model Host?](https://llm-infra.pages.dev/p/rag-vector-store-same-host-or-separate): The vector index lives in RAM, the model lives in VRAM — they compete only when the host runs out of system memory. Size the index first, then decide.
+
+3 published pages. Generated automatically; only published content is listed. Prices and availability follow the merchant page.

@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RAG: Should the Vector Store Live on the Model Host?</title>
+<meta name="description" content="Vector stores use system RAM, models use VRAM. How to size the index and decide whether RAG retrieval belongs on the model host.">
+<meta name="keywords" content="rag vector database same server, vector index memory sizing">
+<link rel="canonical" href="https://llm-infra.pages.dev/p/rag-vector-store-same-host-or-separate.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="RAG: Should the Vector Store Live on the Model Host?">
+<meta property="og:description" content="Vector stores use system RAM, models use VRAM. How to size the index and decide whether RAG retrieval belongs on the model host.">
+<meta property="og:locale" content="en_US">
+<meta property="og:url" content="https://llm-infra.pages.dev/p/rag-vector-store-same-host-or-separate.html">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="robots" content="noindex">
+<style>
+:root{--fg:#40384e;--muted:#8d84a3;--bg:#f7f5fb;--card:#fff;--line:#e6dff2;
+--accent:#8b5cf6;--accent-fg:#fff;--ok:#e879a8;--mark:#ffe066;--tint:#f1ecfb}
+@media (prefers-color-scheme:dark){:root{--fg:#ece7f7;--muted:#9b90b5;--bg:#16121f;
+--card:#201a2e;--line:#352b4d;--accent:#a78bfa;--accent-fg:#1c1233;--ok:#f472b6;
+--mark:#5b4a12;--tint:#292038}}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{counter-reset:sec;font:16px/1.88 -apple-system,BlinkMacSystemFont,"Segoe UI",
+"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;color:var(--fg);background:var(--bg)}
+.wrap{max-width:clamp(720px,88vw,1080px);margin:0 auto;padding:0 22px 88px}
+.wrap p{max-width:46em}
+header{padding:52px 0 30px}
+h1{font-size:2.25rem;line-height:1.3;letter-spacing:-.015em;font-weight:750}
+.sub{color:var(--muted);margin-top:14px;font-size:1.02rem;line-height:1.8}
+.hero-img{width:100%;height:auto;border-radius:18px;margin-top:26px;display:block}
+section{margin-top:42px}
+h2{counter-increment:sec;font-size:1.25rem;font-weight:700;margin:0 0 16px;
+display:table;background:linear-gradient(transparent 62%,var(--mark) 62%);
+padding:2px 4px;border-radius:3px}
+h2::before{content:counter(sec) " ";color:var(--accent);margin-right:2px}
+h3{font-size:1.05rem;margin:22px 0 10px;font-weight:700}
+.price{background:var(--tint);border:1px solid var(--line);border-radius:20px;
+padding:20px 22px;display:flex;align-items:baseline;gap:13px;flex-wrap:wrap}
+.price .now{font-size:2.35rem;font-weight:800;color:var(--accent);line-height:1.05;
+letter-spacing:-.02em}
+.price .was{color:var(--muted);text-decoration:line-through}
+.price .basis{color:var(--muted);font-size:.85rem}
+.price .coupon{background:var(--accent);color:var(--accent-fg);font-size:.78rem;
+padding:4px 12px;border-radius:999px;font-weight:700}
+ul.bullets{list-style:none;margin:8px 0}
+ul.bullets li{position:relative;padding-left:26px;margin:11px 0;line-height:1.85}
+ul.bullets li::before{content:"♥";position:absolute;left:2px;top:.05em;color:var(--ok)}
+ul.bullets.steps li strong{display:inline-block;background:var(--ok);color:#fff;
+border-radius:999px;padding:1px 11px;margin-right:8px;font-size:.78rem;font-weight:700}
+table{width:100%;border-collapse:separate;border-spacing:0;font-size:.93rem;background:var(--card);
+border:1px solid var(--line);border-radius:16px;overflow:hidden;margin-top:6px}
+th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top;
+line-height:1.75}
+th{color:var(--accent);font-weight:700;font-size:.84rem;background:var(--tint)}
+tbody tr:last-child td{border-bottom:none}
+.faq details{background:var(--card);border:1px solid var(--line);border-radius:16px;
+padding:15px 19px;margin:10px 0}
+.faq summary{cursor:pointer;font-weight:700;list-style:none;font-size:1.02rem}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"＋";float:right;color:var(--accent);font-weight:700}
+.faq details[open] summary::after{content:"－"}
+.faq p{margin-top:11px;color:var(--muted);line-height:1.85}
+section>p{margin:13px 0;line-height:1.92}
+pre{background:#2c2140;border:none;border-radius:14px;padding:17px 19px;overflow-x:auto;
+font-size:.85rem;line-height:1.7;color:#efe9ff;
+font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+pre code{background:none;padding:0;color:inherit;border:none}
+code{background:var(--tint);border:none;border-radius:6px;padding:1px 8px;
+font-size:.87em;color:var(--accent);
+font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.cta{display:block;text-align:center;background:linear-gradient(135deg,#8b5cf6,#e879a8);
+color:#fff;text-decoration:none;font-weight:800;font-size:1.08rem;padding:18px;border-radius:999px;
+margin-top:32px;letter-spacing:.03em;box-shadow:0 10px 24px rgba(139,92,246,.32)}
+.cta:active{transform:translateY(2px)}
+.cta-note{text-align:center;color:var(--muted);font-size:.82rem;margin-top:11px}
+.disclosure{margin-top:26px;padding:13px 16px;background:var(--tint);border-radius:14px;
+color:var(--muted);font-size:.83rem;line-height:1.75}
+.related{background:var(--card);border:1px solid var(--line);border-radius:20px;
+padding:20px 22px;margin-top:36px}
+.related h2{font-size:1.02rem;margin-bottom:12px;display:inline-block;background:none}
+.related h2::before{content:none}
+.related ul{list-style:none}
+.related li{margin:9px 0}
+.related a{color:var(--accent);text-decoration:none;font-weight:650}
+.friend-links{background:var(--card);border:1px solid var(--line);border-radius:20px;
+padding:20px 22px;margin-top:22px}
+.friend-links h2{font-size:1.02rem;margin-bottom:12px;display:inline-block;background:none}
+.friend-links h2::before{content:none}
+.friend-links .fl-kind{color:var(--muted);font-size:.75rem;font-weight:400;margin-left:8px}
+.friend-links ul{list-style:none}
+.friend-links li{margin:9px 0}
+.friend-links a{color:var(--fg);text-decoration:none;font-weight:600;
+border-bottom:2px solid var(--line);padding-bottom:1px}
+.friend-links a:hover{border-bottom-color:var(--accent);color:var(--accent)}
+.answer{background:var(--tint);border:1px solid var(--line);border-radius:20px;
+padding:22px 24px;margin-top:24px;position:relative}
+.answer::before{content:"♥";position:absolute;top:-12px;left:22px;width:26px;height:26px;
+border-radius:50%;background:var(--ok);color:#fff;font-size:.8rem;line-height:26px;text-align:center}
+.answer .kicker{color:var(--accent);font-size:.75rem;letter-spacing:.16em;font-weight:700;
+text-transform:uppercase;margin-bottom:11px}
+.answer .stmt{font-size:1.22rem;line-height:1.68;font-weight:750;letter-spacing:-.012em}
+.answer ul{list-style:none;margin-top:15px}
+.answer li{position:relative;padding-left:24px;margin:8px 0;font-size:.96rem;line-height:1.8}
+.answer li::before{content:"♥";position:absolute;left:0;color:var(--ok);font-size:.85em}
+.tool{background:var(--card);border:1px solid var(--line);border-radius:20px;
+padding:22px 24px;margin-top:36px}
+.tool h2{font-size:1.15rem;margin-bottom:11px;display:inline-block;background:none}
+.tool h2::before{content:none}
+.tool-note{color:var(--muted);font-size:.87rem;margin-bottom:16px;line-height:1.8}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:17px}
+.chip{border:1px solid var(--line);border-radius:999px;padding:6px 15px;font-size:.88rem;
+color:var(--fg);text-decoration:none;background:var(--bg);font-weight:600}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+.chip.on{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.embed-credit{margin-top:17px;color:var(--muted);font-size:.8rem;text-align:center;line-height:1.75}
+.embed-credit a{color:var(--accent);font-weight:700;text-decoration:none}
+footer{margin-top:52px;padding-top:20px;border-top:1px solid var(--line);
+color:var(--muted);font-size:.8rem;text-align:center}
+.offline{background:var(--card);border:1px dashed var(--line);border-radius:16px;
+padding:16px;color:var(--muted);text-align:center;font-size:.9rem}
+.unit-box{margin:22px 0;padding:12px 14px;border:1px dashed var(--line);border-radius:14px;
+text-align:center;font-size:.83rem;color:var(--muted)}
+.unit-label{display:inline-block;margin-right:8px;padding:1px 8px;border:1px solid var(--line);
+border-radius:999px;font-size:.7rem;opacity:.8;vertical-align:middle}
+.unit-link{color:var(--accent);font-weight:700;text-decoration:none}
+.unit-media img{max-width:100%;height:auto;display:block;margin:0 auto}
+@media (min-width:640px){h1{font-size:2.7rem}.wrap{padding-bottom:104px}}
+</style>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "Article", "name": "RAG: Should the Vector Store Live on the Model Host?", "inLanguage": "en", "description": "Vector stores use system RAM, models use VRAM. How to size the index and decide whether RAG retrieval belongs on the model host.", "url": "https://llm-infra.pages.dev/p/rag-vector-store-same-host-or-separate.html"}, {"@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Can I put the vector index on the GPU too?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, and it is fast — but on the same GPU the model already occupies. A GPU index trades VRAM for latency, which is the wrong trade when model memory is your constraint. Use it only for small corpora with tight latency budgets."}}, {"@type": "Question", "name": "Does co-locating hurt retrieval quality?", "acceptedAnswer": {"@type": "Answer", "text": "No. Retrieval quality depends on the embedding model and chunking, not on where the index runs. What changes is failure behaviour under memory pressure."}}, {"@type": "Question", "name": "How much RAM should stay free?", "acceptedAnswer": {"@type": "Answer", "text": "Enough that the index plus CPU-side model buffers stay below 80% of total. Past that you are one concurrent rebuild away from the kernel picking a process to kill — and it does not pick the one you would have."}}]}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "LLM Infra Notes", "item": "https://vps.diduu.com/"}, {"@type": "ListItem", "position": 2, "name": "RAG: Should the Vector Store Live on the Model Host?", "item": "https://llm-infra.pages.dev/p/rag-vector-store-same-host-or-separate.html"}]}]}</script>
+</head>
+<body class="tpl-notebook">
+<div class="wrap">
+<header><h1>RAG: Should the Vector Store Live on the Model Host?</h1><p class="sub">Same machine is simpler and faster until memory pressure turns your p99 into a random number.</p></header>
+<section class="answer"><p class="kicker">In short</p><p class="stmt">The vector index lives in RAM, the model lives in VRAM — they compete only when the host runs out of system memory. Size the index first, then decide.</p></section>
+<section><h2>Two budgets people confuse</h2><p>A vector database and a model on the same host do not fight over the same memory. The model occupies GPU memory. The index occupies system memory, unless you deliberately built a GPU index.</p><p>So the question is not &quot;do they fit in 24 GB&quot; — it is &quot;does the host have enough RAM for the index plus everything else&quot;. Those are different budgets, and conflating them is how people end up renting a bigger GPU to fix a RAM problem.</p></section>
+<section><h2>Sizing the index before deciding anything</h2><p>Raw vectors are easy: count × dimensions × 4 bytes for fp32. One million 768-dimension vectors is about 3 GB.</p><p>The index structure is the part people forget. HNSW keeps a graph alongside the vectors, and the overhead is substantial — plan for roughly 50% on top, more at high M values. That same million vectors is then closer to 4.5 GB resident.</p><p>Then add headroom. A vector database being written to while serving reads needs room for both the current graph and the rebuild. Sitting at 85% RAM utilisation is not &quot;fine&quot; — it is the state right before the OOM killer picks a victim, and the victim is usually the process serving traffic.</p></section>
+<section><h2>What each component actually occupies</h2><table><thead><tr><th>Component</th><th>Lives in</th><th>Grows with</th><th>Fails how</th></tr></thead><tbody><tr><td>Model weights</td><td>VRAM</td><td>parameters × precision</td><td>hard OOM at load</td></tr><tr><td>KV cache</td><td>VRAM</td><td>context × concurrency</td><td>OOM under load</td></tr><tr><td>Vector index</td><td>System RAM</td><td>vectors × dims × index type</td><td>swap, then OOM killer</td></tr><tr><td>Reranker</td><td>VRAM or CPU</td><td>batch size</td><td>latency spike</td></tr></tbody></table></section>
+<section><h2>When same-host is the right call</h2><p>For a single-tenant service with a modest corpus, co-locating is the better engineering choice. The retrieval call becomes a loopback request instead of a network hop, which removes an entire failure mode: the p99 spike that used to arrive with every network hiccup stops happening.</p><p>It is also cheaper and easier to reason about. One machine to monitor, one set of logs, one deploy. At small scale that operational simplicity is worth more than the theoretical isolation you gave up.</p></section>
+<section><h2>When to split them</h2><ul class="bullets"><li>The index needs more RAM than the model host can spare — the common case once you pass a few million vectors.</li><li>You need to scale retrieval independently. Query load and generation load rarely grow at the same rate.</li><li>The corpus is shared by several model endpoints. One index serving three services beats three copies of the same index.</li><li>You rebuild the index regularly and cannot afford the memory spike next to the model process.</li></ul></section>
+<section><h3>Check what the process actually holds</h3><pre><code class="language-bash"># RSS is what matters -- VIRT includes mapped files that are
+# not resident and will make you think headroom is smaller
+# than it is.
+ps -o pid,rss,vsz,cmd -p $(pgrep -d, -f vector)
+
+# Available, not free. `free` counts page cache as used,
+# which makes a healthy host look nearly dead.
+free -m | awk &#x27;NR==2 {print &quot;available: &quot; $7 &quot; MB&quot;}&#x27;</code></pre></section>
+<section class="faq"><h2>Common questions</h2><details><summary>Can I put the vector index on the GPU too?</summary><p>Yes, and it is fast — but on the same GPU the model already occupies. A GPU index trades VRAM for latency, which is the wrong trade when model memory is your constraint. Use it only for small corpora with tight latency budgets.</p></details><details><summary>Does co-locating hurt retrieval quality?</summary><p>No. Retrieval quality depends on the embedding model and chunking, not on where the index runs. What changes is failure behaviour under memory pressure.</p></details><details><summary>How much RAM should stay free?</summary><p>Enough that the index plus CPU-side model buffers stay below 80% of total. Past that you are one concurrent rebuild away from the kernel picking a process to kill — and it does not pick the one you would have.</p></details></section>
+<section><h2>Decide with four numbers</h2><ul class="bullets steps"><li><strong>Step 1.</strong> Count vectors and multiply by dimensions × 4 bytes.</li><li><strong>Step 2.</strong> Add roughly 50% for the HNSW graph — check your index type&#x27;s documentation, the overhead varies.</li><li><strong>Step 3.</strong> Compare against the host&#x27;s available RAM, not total RAM.</li><li><strong>Step 4.</strong> If it exceeds 60% of available, split the deployment; otherwise co-locate and keep the loopback path.</li></ul></section>
+<section class="related"><h2>Related reading</h2><ul><li><a href="./p/gpu-utilization-low-while-serving.html">Why Your GPU Sits at 30% While Serving Requests</a></li><li><a href="./p/how-much-vram-does-an-llm-need.html">How Much VRAM Does an LLM Actually Need?</a></li></ul></section>
+
+
+<footer>© 2026 · This site contains affiliate links; prices may change at any time.</footer>
+</div>
+</body>
+</html>

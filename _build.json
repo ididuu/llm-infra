@@ -1,0 +1,97 @@
+{
+  "site_id": "69e32c7c-69f6-4be5-8123-37c1a83e3dbe",
+  "site_name": "LLM Infra Notes",
+  "template": "article",
+  "page_count": 3,
+  "shortlink_base_url": "https://t.diduu.com",
+  "generated_at": "2026-11-05T18:49:54",
+  "skipped": [],
+  "audits": [
+    {
+      "page_id": "55d3c976-77c2-4fd2-847c-df1c440578e1",
+      "slug": "gpu-utilization-low-while-serving",
+      "title": "Why Your GPU Sits at 30% While Serving Requests",
+      "score": 92,
+      "grade": "A",
+      "p0_failed": [],
+      "p1_failed": [
+        "readable"
+      ],
+      "verdict": "1 项 P1 待补 —— 能上线，但被搜到、被引用的概率偏低"
+    },
+    {
+      "page_id": "be337492-01f8-4e9f-aeb5-74a188fa1efd",
+      "slug": "rag-vector-store-same-host-or-separate",
+      "title": "RAG: Should the Vector Store Live on the Model Host?",
+      "score": 100,
+      "grade": "A",
+      "p0_failed": [],
+      "p1_failed": [],
+      "verdict": "全部通过"
+    },
+    {
+      "page_id": "08167134-5f11-434f-b66b-07dc182e3dd2",
+      "slug": "how-much-vram-does-an-llm-need",
+      "title": "How Much VRAM Does an LLM Actually Need?",
+      "score": 100,
+      "grade": "A",
+      "p0_failed": [],
+      "p1_failed": [],
+      "verdict": "全部通过"
+    }
+  ],
+  "beian": {
+    "host": "llm-infra.pages.dev",
+    "required": false,
+    "no": "豫ICP备14018255号-1",
+    "pages": {
+      "skip-host": 5
+    },
+    "missing": false
+  },
+  "injection": {
+    "lines": {
+      "cps": {
+        "state": "none",
+        "source": "none",
+        "asset_id": "",
+        "name": "",
+        "note": ""
+      },
+      "ad": {
+        "state": "none",
+        "source": "none",
+        "asset_id": "",
+        "name": "",
+        "note": ""
+      },
+      "stats": {
+        "state": "none",
+        "source": "none",
+        "asset_id": "",
+        "name": "",
+        "note": ""
+      },
+      "js": {
+        "state": "none",
+        "source": "none",
+        "asset_id": "",
+        "name": "",
+        "note": ""
+      }
+    },
+    "upstream_down": false,
+    "takeover_analytics": false,
+    "counts": {
+      "pages": 4,
+      "ad": 0,
+      "stats": 0,
+      "loader": 0
+    }
+  },
+  "content_pack": {
+    "site_code": "llm-infra",
+    "count": 0,
+    "slugs": []
+  }
+}

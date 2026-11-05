@@ -1,0 +1,7 @@
+User-agent: *
+Disallow: /console
+Disallow: /api/
+
+Allow: /p/
+
+Sitemap: https://llm-infra.pages.dev/sitemap.xml

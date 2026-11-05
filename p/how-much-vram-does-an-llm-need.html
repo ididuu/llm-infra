@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>How Much VRAM Does an LLM Actually Need?</title>
+<meta name="description" content="A recomputable method for sizing LLM VRAM: weights, KV cache, activations and CUDA context — with the formula most guides skip.">
+<meta name="keywords" content="llm vram calculation, kv cache size, gpu memory for llm">
+<link rel="canonical" href="https://llm-infra.pages.dev/p/how-much-vram-does-an-llm-need.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="How Much VRAM Does an LLM Actually Need?">
+<meta property="og:description" content="A recomputable method for sizing LLM VRAM: weights, KV cache, activations and CUDA context — with the formula most guides skip.">
+<meta property="og:locale" content="en_US">
+<meta property="og:url" content="https://llm-infra.pages.dev/p/how-much-vram-does-an-llm-need.html">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="robots" content="noindex">
+<style>
+:root{--fg:#3b2f1e;--muted:#8a7355;--bg:#f3ead8;--card:#faf4e4;--line:#d8c69a;
+--accent:#b45309;--accent-fg:#fff;--ok:#6b705c}
+@media (prefers-color-scheme:dark){:root{--fg:#efe3c8;--muted:#b09a72;--bg:#241c10;
+--card:#2f2515;--line:#4d3d22;--accent:#e0813c;--accent-fg:#fff;--ok:#a3ad8e}}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{counter-reset:sec;font:16px/1.85 Georgia,"Songti SC","SimSun",serif;
+color:var(--fg);background:var(--bg)}
+.wrap{max-width:clamp(720px,88vw,1080px);margin:0 auto;padding:0 22px 88px}
+.wrap p{max-width:46em}
+header{padding:54px 0 32px;border-bottom:3px double var(--line);text-align:center}
+h1{font-size:2.2rem;line-height:1.32;letter-spacing:.015em;font-weight:700}
+.sub{color:var(--muted);margin-top:14px;font-size:1.02rem;font-style:italic}
+.hero-img{width:100%;height:auto;border:1px solid var(--line);margin-top:26px;display:block;
+padding:7px;background:var(--card)}
+section{margin-top:46px}
+h2{counter-increment:sec;font-size:1.3rem;font-weight:700;margin-bottom:14px;letter-spacing:.02em}
+h2::before{content:counter(sec,upper-roman) ".  ";color:var(--accent)}
+h3{font-size:1.05rem;margin:22px 0 10px;font-style:italic}
+.price{background:var(--card);border:1px solid var(--line);border-radius:4px;
+padding:18px 20px;display:flex;align-items:baseline;gap:13px;flex-wrap:wrap}
+.price .now{font-size:2.35rem;font-weight:700;color:var(--accent);line-height:1.05}
+.price .was{color:var(--muted);text-decoration:line-through;font-style:italic}
+.price .basis{color:var(--muted);font-size:.86rem}
+.price .coupon{background:none;color:var(--accent);border:1.5px dashed var(--accent);
+font-size:.78rem;padding:3px 11px;border-radius:2px;font-weight:700;letter-spacing:.05em}
+ul.bullets{list-style:none;margin:6px 0}
+ul.bullets li{position:relative;padding-left:24px;margin:11px 0;line-height:1.85}
+ul.bullets li::before{content:"◆";position:absolute;left:2px;top:.05em;color:var(--accent)}
+ul.bullets.steps li strong{color:var(--accent);font-weight:700;margin-right:6px}
+table{width:100%;border-collapse:collapse;font-size:.95rem;background:var(--card);
+border-top:3px double var(--line);border-bottom:3px double var(--line);margin-top:6px}
+th,td{text-align:left;padding:12px 12px;border-bottom:1px solid var(--line);vertical-align:top;
+line-height:1.7}
+th{color:var(--accent);font-weight:700;font-size:.85rem;letter-spacing:.06em;
+font-style:italic;border-bottom:1px solid var(--accent)}
+.faq details{background:none;border:none;border-bottom:1px dashed var(--line);border-radius:0;
+padding:17px 0;margin:0}
+.faq summary{cursor:pointer;font-weight:700;list-style:none;font-size:1.05rem}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"[+]";float:right;color:var(--accent);font-weight:700;
+font-family:Georgia,serif;font-size:.88rem}
+.faq details[open] summary::after{content:"[-]"}
+.faq p{margin-top:11px;color:var(--muted);line-height:1.85;font-style:italic}
+section>p{margin:13px 0;line-height:1.9}
+pre{background:var(--card);border:1px solid var(--line);border-radius:3px;padding:16px 18px;
+overflow-x:auto;font-size:.86rem;line-height:1.7;
+font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+pre code{background:none;padding:0;border:none}
+code{background:var(--card);border:1px solid var(--line);border-radius:2px;padding:1px 6px;
+font-size:.87em;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.cta{display:block;text-align:center;background:var(--accent);color:var(--accent-fg);
+text-decoration:none;font-weight:700;font-size:1.05rem;padding:16px;border-radius:3px;
+margin-top:32px;letter-spacing:.14em}
+.cta:hover{filter:brightness(1.1)}
+.cta:active{transform:translateY(1px)}
+.cta-note{text-align:center;color:var(--muted);font-size:.82rem;margin-top:11px;font-style:italic}
+.disclosure{margin-top:26px;padding-top:15px;border-top:1px dashed var(--line);
+color:var(--muted);font-size:.83rem;line-height:1.75;font-style:italic}
+.related{background:none;border-top:3px double var(--line);border-bottom:3px double var(--line);
+padding:22px 0;margin-top:46px}
+.related h2{font-size:.95rem;margin-bottom:14px;font-style:italic;letter-spacing:.12em}
+.related h2::before{content:none}
+.related ul{list-style:none}
+.related li{margin:10px 0}
+.related a{color:var(--accent);text-decoration:none;border-bottom:1px solid var(--line);
+padding-bottom:2px}
+.related a:hover{border-bottom-color:var(--accent)}
+.friend-links{background:none;border-top:1px dashed var(--line);padding:22px 0 0;margin-top:36px}
+.friend-links h2{font-size:.95rem;margin-bottom:14px;font-style:italic;letter-spacing:.12em}
+.friend-links h2::before{content:none}
+.friend-links .fl-kind{color:var(--muted);font-size:.75rem;font-style:normal;margin-left:8px}
+.friend-links ul{list-style:none}
+.friend-links li{margin:10px 0}
+.friend-links a{color:var(--fg);text-decoration:none;border-bottom:1px solid var(--line)}
+.friend-links a:hover{border-bottom-color:var(--accent);color:var(--accent)}
+.answer{background:var(--card);border:none;border-top:3px double var(--accent);
+border-bottom:3px double var(--accent);border-radius:3px;padding:24px 22px;margin-top:30px;
+text-align:center}
+.answer .kicker{color:var(--accent);font-size:.75rem;letter-spacing:.28em;font-weight:700;
+text-transform:uppercase;margin-bottom:14px}
+.answer .stmt{font-size:1.3rem;line-height:1.7;font-weight:700;font-style:italic}
+.answer ul{list-style:none;margin-top:16px;text-align:left}
+.answer li{position:relative;padding-left:22px;margin:8px 0;font-size:.98rem;line-height:1.8}
+.answer li::before{content:"◆";position:absolute;left:2px;color:var(--accent)}
+.tool{background:var(--card);border:1px solid var(--line);border-radius:4px;
+padding:22px 22px;margin-top:36px}
+.tool h2{font-size:1.15rem;margin-bottom:12px}
+.tool h2::before{content:none}
+.tool-note{color:var(--muted);font-size:.87rem;margin-bottom:16px;font-style:italic;line-height:1.8}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.chip{border:1px dashed var(--line);border-radius:2px;padding:6px 14px;font-size:.88rem;
+color:var(--muted);text-decoration:none;background:var(--bg)}
+.chip:hover{border-color:var(--accent);color:var(--accent);border-style:solid}
+.chip.on{background:var(--accent);border-color:var(--accent);border-style:solid;
+color:var(--accent-fg);font-weight:700}
+.embed-credit{margin-top:18px;color:var(--muted);font-size:.8rem;text-align:center;line-height:1.75}
+.embed-credit a{color:var(--accent);font-weight:700;text-decoration:none}
+footer{margin-top:56px;padding-top:20px;border-top:1px dashed var(--line);
+color:var(--muted);font-size:.8rem;font-style:italic;text-align:center}
+.offline{background:var(--card);border:1px dashed var(--line);border-radius:3px;
+padding:16px;color:var(--muted);text-align:center;font-size:.9rem}
+.unit-box{margin:24px 0;padding:11px 13px;border:1px dashed var(--line);border-radius:2px;
+text-align:center;font-size:.83rem;color:var(--muted)}
+.unit-label{display:inline-block;margin-right:8px;padding:1px 7px;border:1px solid var(--line);
+border-radius:2px;font-size:.7rem;opacity:.8;vertical-align:middle}
+.unit-link{color:var(--accent);font-weight:700;text-decoration:none;border-bottom:1px solid var(--line)}
+.unit-media img{max-width:100%;height:auto;display:block;margin:0 auto}
+@media (min-width:640px){h1{font-size:2.65rem}.wrap{padding-bottom:104px}}
+</style>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "Article", "name": "How Much VRAM Does an LLM Actually Need?", "inLanguage": "en", "description": "A recomputable method for sizing LLM VRAM: weights, KV cache, activations and CUDA context — with the formula most guides skip.", "url": "https://llm-infra.pages.dev/p/how-much-vram-does-an-llm-need.html"}, {"@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Can I just check the model's parameter count and multiply?", "acceptedAnswer": {"@type": "Answer", "text": "For weights, yes: parameters × bytes per parameter. For anything else, no. Context length and batch size change the answer by an order of magnitude, which is why a model that fits in a quick test can OOM in production with identical code."}}, {"@type": "Question", "name": "Why does the same model OOM in production but not in testing?", "acceptedAnswer": {"@type": "Answer", "text": "Concurrency. Testing usually runs one request at a time; production holds several KV caches at once. Paged attention and continuous batching reduce fragmentation but do not remove the per-token cost."}}, {"@type": "Question", "name": "Is 4-bit quantization lossless enough for production?", "acceptedAnswer": {"@type": "Answer", "text": "It is a trade, not a free lunch. 4-bit weights cost long-tail factual recall first, which is exactly what evaluation sets tend to miss. Keep an FP16 baseline and compare on your own task before shipping."}}, {"@type": "Question", "name": "Where do these architecture numbers come from?", "acceptedAnswer": {"@type": "Answer", "text": "From the model's own config.json — layer count, attention heads, and key/value heads. Do not copy numbers between model families; GQA and MHA differ by a large factor in cache cost."}}]}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "LLM Infra Notes", "item": "https://vps.diduu.com/"}, {"@type": "ListItem", "position": 2, "name": "How Much VRAM Does an LLM Actually Need?", "item": "https://llm-infra.pages.dev/p/how-much-vram-does-an-llm-need.html"}]}]}</script>
+</head>
+<body class="tpl-retro">
+<div class="wrap">
+<header><h1>How Much VRAM Does an LLM Actually Need?</h1><p class="sub">Weights are the easy part. The context cache is what actually decides whether the model fits.</p></header>
+<section class="answer"><p class="kicker">In short</p><p class="stmt">A 7B model takes about 14 GB of FP16 weights, but 8K context at batch 8 needs about 30 GB of KV cache. Size the cache first, then precision, then the card.</p></section>
+<section><h2>Why OOM is almost never about the weights</h2><p>The first time a 13B model hits torch.OutOfMemoryError halfway through loading, the instinct is to rent a bigger card. That instinct is usually wrong, and it is the expensive answer.</p><p>Weights load once and then never change. Everything else on the card is allocated per request and scales with how many people you serve at once. A 13B model in 4-bit leaves roughly 19 GB free on a 24 GB card — and a busy endpoint can eat all of it with context alone, while the weights sit there unchanged.</p></section>
+<section><h2>The four consumers of VRAM</h2><table><thead><tr><th>Component</th><th>7B FP16</th><th>7B 4-bit</th><th>Scales with</th></tr></thead><tbody><tr><td>Weights</td><td>~14 GB</td><td>~4 GB</td><td>parameters × precision</td></tr><tr><td>KV cache</td><td>~0.5 MB / token</td><td>~0.5 MB / token</td><td>layers × kv-heads × context × batch</td></tr><tr><td>Activations</td><td>1–3 GB</td><td>1–3 GB</td><td>batch × sequence length</td></tr><tr><td>CUDA context</td><td>1–2 GB</td><td>1–2 GB</td><td>fixed per process</td></tr></tbody></table></section>
+<section><h2>The KV cache formula, written out</h2><p>For each token you keep two tensors (a key and a value) for every layer and every key/value head. So the cost per token is:</p><p>2 × layers × kv_heads × head_dim × bytes_per_element</p><p>For a 32-layer model with 32 KV heads of dimension 128 in FP16 that is 2 × 32 × 32 × 128 × 2 = 524,288 bytes, or 0.5 MB per token. At 8K context that is 4 GB for a single request. At batch 8 it is 32 GB — and now the card is gone before the weights are even counted.</p><p>This is why grouped-query attention changed the economics. A 70B model with 80 layers but only 8 KV heads costs 2 × 80 × 8 × 128 × 2 = 320 KB per token — less per token than the 7B example above, despite having twenty times the parameters. Parameter count tells you the weight size. It tells you nothing useful about the cache.</p></section>
+<section><h3>Recompute it for the exact model you are deploying</h3><pre><code class="language-python">import json
+
+cfg = json.load(open(&quot;config.json&quot;))
+
+layers    = cfg[&quot;num_hidden_layers&quot;]
+hidden    = cfg[&quot;hidden_size&quot;]
+heads     = cfg[&quot;num_attention_heads&quot;]
+# GQA models expose fewer KV heads than attention heads.
+# Falling back to `heads` overestimates KV cache by the
+# group factor -- common mistake when sizing Llama-3.
+kv_heads  = cfg.get(&quot;num_key_value_heads&quot;, heads)
+head_dim  = cfg.get(&quot;head_dim&quot;, hidden // heads)
+
+def kv_bytes_per_token(dtype_bytes=2):
+    return 2 * layers * kv_heads * head_dim * dtype_bytes
+
+def total_gb(params_b, ctx, batch=1,
+             weight_bpp=2, kv_bytes=2, overhead_gb=1.5):
+    weights = params_b * 1e9 * weight_bpp / 1024**3
+    kv = (kv_bytes_per_token(kv_bytes) * ctx * batch) / 1024**3
+    # activations + fragmentation, roughly 15% of weights
+    acts = weights * 0.15
+    return weights + kv + acts + overhead_gb
+
+print(f&quot;KV/token: {kv_bytes_per_token()/1024:.0f} KB&quot;)
+for ctx in (4096, 8192, 32768):
+    for b in (1, 8):
+        print(f&quot;ctx={ctx:6} batch={b}: &quot;
+              f&quot;{total_gb(7, ctx, b):5.1f} GB&quot;)</code></pre></section>
+<section><h2>Order of operations when the card is too small</h2><ul class="bullets"><li>Quantize the weights first — 4-bit cuts the largest fixed cost with almost no engineering effort.</li><li>Quantize the KV cache too. Many people stop after the weights and find the freed memory immediately absorbed by the cache.</li><li>Cut context length before cutting concurrency. Long context is usually a feature request, not a hard requirement.</li><li>Reduce the model. A smaller model improves concurrency and latency at the same time — it is a structural win, not a trick.</li><li>Only then rent a bigger card, and only if precision or context length is a hard constraint rather than a nice-to-have.</li></ul></section>
+<section class="tool picker"><h2>Which card actually fits your case</h2><p class="tool-note">Pick the row closest to your deployment. All figures are recomputed from the formula above, not from vendor spec sheets.</p><div class="chips"><a class="chip" href="#pk-dev-7b">7B, single user, testing</a><a class="chip" href="#pk-prod-7b">7B serving real traffic</a><a class="chip" href="#pk-prod-70b">70B quantized, low concurrency</a><a class="chip" href="#pk-embeddings">Embedding / reranker only</a></div><div class="pk-list"><article class="pk" id="pk-dev-7b"><h3>7B, single user, testing</h3><p class="pk-pick">24 GB card (RTX 3090 / 4090 / L4)</p><ul><li>4-bit weights ~4 GB, leaving ~18 GB for context</li><li>8K context at batch 1 costs ~4 GB — comfortable</li><li>No reason to pay for a datacenter card at this stage</li></ul><p class="pk-watch">Batch 4 at 8K context already needs ~16 GB of cache. If you plan to load-test, size for the batch you intend to serve, not for the batch you test with.</p></article><article class="pk" id="pk-prod-7b"><h3>7B serving real traffic</h3><p class="pk-pick">48 GB card (L40S / A6000), or 2 × 24 GB</p><ul><li>8K context at batch 8 is ~32 GB of cache alone</li><li>Headroom matters: a single long request should not stall the queue</li><li>Two replicas on separate cards beat one large card for availability</li></ul><p class="pk-watch">Multi-GPU tensor parallelism splits the weights, not the cache linearly — cross-card traffic becomes the bottleneck before memory does.</p></article><article class="pk" id="pk-prod-70b"><h3>70B quantized, low concurrency</h3><p class="pk-pick">2 × 48 GB or 1 × 80 GB (A100 / H100)</p><ul><li>4-bit weights ~35 GB — already past a single 24 GB card</li><li>GQA keeps cache small: ~0.3 MB per token</li><li>80 GB fits weights plus 8K context at modest batch</li></ul><p class="pk-watch">70B at 4-bit degrades long-tail knowledge first. Keep an FP16 baseline to compare against, or you will misread a quality regression as a prompt problem.</p></article><article class="pk" id="pk-embeddings"><h3>Embedding / reranker only</h3><p class="pk-pick">16–24 GB, no datacenter card needed</p><ul><li>Embedding models are small and have no KV cache growth from long generation</li><li>Throughput comes from batching, not from VRAM size</li><li>A CPU-only host handles low-volume indexing</li></ul><p class="pk-watch">Do not co-locate the embedding model with a large generation model and assume they share memory politely. They do not — reserve separate headroom.</p></article></div></section>
+<section class="faq"><h2>Common questions</h2><details><summary>Can I just check the model&#x27;s parameter count and multiply?</summary><p>For weights, yes: parameters × bytes per parameter. For anything else, no. Context length and batch size change the answer by an order of magnitude, which is why a model that fits in a quick test can OOM in production with identical code.</p></details><details><summary>Why does the same model OOM in production but not in testing?</summary><p>Concurrency. Testing usually runs one request at a time; production holds several KV caches at once. Paged attention and continuous batching reduce fragmentation but do not remove the per-token cost.</p></details><details><summary>Is 4-bit quantization lossless enough for production?</summary><p>It is a trade, not a free lunch. 4-bit weights cost long-tail factual recall first, which is exactly what evaluation sets tend to miss. Keep an FP16 baseline and compare on your own task before shipping.</p></details><details><summary>Where do these architecture numbers come from?</summary><p>From the model&#x27;s own config.json — layer count, attention heads, and key/value heads. Do not copy numbers between model families; GQA and MHA differ by a large factor in cache cost.</p></details></section>
+<section><h2>Do this before renting anything</h2><ul class="bullets steps"><li><strong>Step 1.</strong> Read config.json and note layers, attention heads, and KV heads.</li><li><strong>Step 2.</strong> Compute KV bytes per token with the formula above.</li><li><strong>Step 3.</strong> Multiply by the context length and the concurrency you actually expect — not the concurrency you hope for.</li><li><strong>Step 4.</strong> Add weights at the precision you can afford to run.</li><li><strong>Step 5.</strong> Pick the smallest card that leaves 20% headroom, and test at the batch size you sized for.</li></ul></section>
+<section class="related"><h2>Related reading</h2><ul><li><a href="./p/rag-vector-store-same-host-or-separate.html">RAG: Should the Vector Store Live on the Model Host?</a></li><li><a href="./p/gpu-utilization-low-while-serving.html">Why Your GPU Sits at 30% While Serving Requests</a></li></ul></section>
+
+
+<footer>© 2026 · This site contains affiliate links; prices may change at any time.</footer>
+</div>
+</body>
+</html>

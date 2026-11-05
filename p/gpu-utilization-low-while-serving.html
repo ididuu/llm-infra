@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Why Your GPU Sits at 30% While Serving Requests</title>
+<meta name="description" content="Low GPU utilisation during LLM serving is usually an unbatched workload, not weak hardware. What to measure, and what to change.">
+<meta name="keywords" content="gpu utilization low llm serving, continuous batching throughput">
+<link rel="canonical" href="https://llm-infra.pages.dev/p/gpu-utilization-low-while-serving.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Why Your GPU Sits at 30% While Serving Requests">
+<meta property="og:description" content="Low GPU utilisation during LLM serving is usually an unbatched workload, not weak hardware. What to measure, and what to change.">
+<meta property="og:locale" content="en_US">
+<meta property="og:url" content="https://llm-infra.pages.dev/p/gpu-utilization-low-while-serving.html">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="robots" content="noindex">
+<style>
+:root{--fg:#241a12;--muted:#7c6a5c;--bg:#fffaf4;--card:#fff1e2;--line:#f3ddc6;
+--accent:#f4511e;--accent-fg:#fff;--ok:#2e9e5b;--glow:linear-gradient(135deg,#ff7a3d,#f4485f)}
+@media (prefers-color-scheme:dark){:root{--fg:#f7ede2;--muted:#bba492;--bg:#171008;
+--card:#241a10;--line:#3b2c1c;--accent:#ff7a4d;--accent-fg:#fff;--ok:#54c47e;
+--glow:linear-gradient(135deg,#ff8a52,#f4607a)}}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{font:16px/1.75 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",
+"Hiragino Sans GB","Microsoft YaHei",sans-serif;color:var(--fg);background:var(--bg)}
+.wrap{max-width:clamp(760px,88vw,1080px);margin:0 auto;padding:0 18px 72px}
+.wrap p{max-width:46em}
+header{padding:44px 18px 34px;margin:0 -18px 8px;background:var(--glow);color:#fff;text-align:center}
+h1{font-size:1.95rem;line-height:1.28;letter-spacing:-.01em;color:#fff}
+.sub{color:rgba(255,255,255,.88);margin-top:12px;font-size:1.02rem}
+.hero-img{width:100%;height:auto;border-radius:18px;margin-top:22px;display:block;
+box-shadow:0 18px 40px rgba(80,30,0,.28)}
+section{margin-top:28px}
+h2{font-size:1.18rem;margin-bottom:12px;letter-spacing:-.01em}
+h3{font-size:1rem;margin:18px 0 8px}
+.price{background:var(--card);border:1px solid var(--line);border-radius:18px;
+padding:18px 22px;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;
+box-shadow:0 8px 22px rgba(120,50,0,.08)}
+.price .now{font-size:2.15rem;font-weight:800;color:var(--accent);line-height:1.1}
+.price .was{color:var(--muted);text-decoration:line-through}
+.price .basis{color:var(--muted);font-size:.85rem}
+.price .coupon{background:var(--accent);color:var(--accent-fg);font-size:.8rem;
+padding:4px 12px;border-radius:999px;font-weight:700}
+ul.bullets{list-style:none}
+ul.bullets li{position:relative;padding-left:30px;margin:11px 0}
+ul.bullets li::before{content:"✓";position:absolute;left:2px;top:.12em;width:19px;height:19px;
+border-radius:50%;background:var(--ok);color:#fff;font-size:.72rem;line-height:19px;text-align:center}
+table{width:100%;border-collapse:separate;border-spacing:0;font-size:.95rem;background:var(--bg);
+border:1px solid var(--line);border-radius:16px;overflow:hidden}
+th,td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:600;font-size:.86rem;background:var(--card)}
+tr:last-child td{border-bottom:none}
+.faq details{background:var(--card);border:1px solid var(--line);border-radius:16px;
+padding:15px 18px;margin:10px 0}
+.faq summary{cursor:pointer;font-weight:600;list-style:none}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"＋";float:right;color:var(--accent);font-weight:700}
+.faq details[open] summary::after{content:"－"}
+.faq p{margin-top:10px;color:var(--muted)}
+section>p{margin:12px 0}
+pre{background:#22160c;color:#ffeede;border-radius:14px;padding:16px 18px;overflow-x:auto;
+font-size:.86rem;line-height:1.6;
+font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+pre code{background:none;padding:0;color:inherit;border:none}
+code{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:1px 7px;
+font-size:.88em;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.cta{display:block;text-align:center;background:var(--glow);color:#fff;
+text-decoration:none;font-weight:800;font-size:1.12rem;padding:18px;border-radius:16px;
+margin-top:28px;box-shadow:0 12px 28px rgba(244,81,30,.35);letter-spacing:.02em}
+.cta:active{transform:translateY(2px)}
+.cta-note{text-align:center;color:var(--muted);font-size:.84rem;margin-top:10px}
+.disclosure{margin-top:24px;padding:14px 16px;background:var(--card);border-radius:12px;
+color:var(--muted);font-size:.85rem;line-height:1.6}
+.related{background:var(--card);border:1px solid var(--line);border-radius:18px;
+padding:18px 22px;margin-top:30px}
+.related h2{font-size:1.02rem;margin-bottom:8px}
+.related ul{list-style:none}
+.related li{margin:8px 0}
+.related a{color:var(--accent);text-decoration:none;font-weight:600}
+.friend-links{background:var(--card);border:1px solid var(--line);border-radius:18px;
+padding:18px 22px;margin-top:26px}
+.friend-links h2{font-size:1.02rem;margin-bottom:8px}
+.friend-links .fl-kind{color:var(--muted);font-size:.78rem;font-weight:400;margin-left:8px}
+.friend-links ul{list-style:none}
+.friend-links li{margin:8px 0}
+.friend-links a{color:var(--fg);text-decoration:none;font-weight:600;
+border-bottom:2px solid var(--line);padding-bottom:1px}
+.friend-links a:hover{border-bottom-color:var(--accent)}
+.answer{background:#fff3e8;border:1px solid var(--line);border-left:6px solid var(--accent);
+border-radius:18px;padding:20px 22px;margin-top:24px}
+.answer .kicker{color:var(--accent);font-size:.75rem;letter-spacing:.14em;font-weight:800;
+text-transform:uppercase;margin-bottom:8px}
+.answer .stmt{font-size:1.12rem;line-height:1.65;font-weight:700}
+.answer ul{list-style:none;margin-top:12px}
+.answer li{position:relative;padding-left:22px;margin:7px 0;color:var(--muted);font-size:.94rem}
+.answer li::before{content:"→";position:absolute;left:0;color:var(--accent);font-weight:700}
+.tool{background:var(--card);border:1px solid var(--line);border-radius:18px;
+padding:20px 22px;margin-top:30px}
+.tool h2{font-size:1.18rem;margin-bottom:8px}
+.tool-note{color:var(--muted);font-size:.86rem;margin-bottom:14px}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.chip{border:1px solid var(--line);border-radius:999px;padding:7px 16px;font-size:.88rem;
+color:var(--fg);text-decoration:none;background:var(--bg);font-weight:600}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+.chip.on{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.embed-credit{margin-top:16px;color:var(--muted);font-size:.8rem;text-align:center;line-height:1.65}
+.embed-credit a{color:var(--accent);font-weight:700;text-decoration:none}
+footer{margin-top:36px;padding-top:18px;border-top:1px solid var(--line);
+color:var(--muted);font-size:.8rem;text-align:center}
+.offline{background:var(--card);border:1px dashed var(--line);border-radius:14px;
+padding:16px;color:var(--muted);text-align:center;font-size:.9rem}
+.unit-box{margin:20px 0;padding:12px;border:1px dashed var(--line);border-radius:12px;
+text-align:center;font-size:.85rem;color:var(--muted)}
+.unit-label{display:inline-block;margin-right:8px;padding:1px 7px;border:1px solid var(--line);
+border-radius:999px;font-size:.7rem;opacity:.75;vertical-align:middle}
+.unit-link{color:var(--accent);font-weight:700;text-decoration:none}
+.unit-media img{max-width:100%;height:auto;display:block;margin:0 auto}
+@media (min-width:640px){h1{font-size:2.45rem}.wrap{padding-bottom:88px}
+header{padding:64px 28px 46px}}
+</style>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "Article", "name": "Why Your GPU Sits at 30% While Serving Requests", "inLanguage": "en", "description": "Low GPU utilisation during LLM serving is usually an unbatched workload, not weak hardware. What to measure, and what to change.", "url": "https://llm-infra.pages.dev/p/gpu-utilization-low-while-serving.html"}, {"@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does batching make every request slower?", "acceptedAnswer": {"@type": "Answer", "text": "Slightly, yes — while total throughput rises a lot. That is the trade. If one user's latency is a hard requirement, cap batch by size rather than by waiting for a full batch."}}, {"@type": "Question", "name": "Will a bigger GPU fix low utilisation?", "acceptedAnswer": {"@type": "Answer", "text": "No — it lowers utilisation further. If the card is idle because nothing is scheduled on it, a bigger card is idle more expensively."}}, {"@type": "Question", "name": "Should I just raise max batch size?", "acceptedAnswer": {"@type": "Answer", "text": "Only together with a KV cache calculation. Batch size multiplies cache usage, and the OOM that follows arrives under load — which makes it look like a stability problem instead of a sizing one."}}]}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "LLM Infra Notes", "item": "https://vps.diduu.com/"}, {"@type": "ListItem", "position": 2, "name": "Why Your GPU Sits at 30% While Serving Requests", "item": "https://llm-infra.pages.dev/p/gpu-utilization-low-while-serving.html"}]}]}</script>
+</head>
+<body class="tpl-vivid">
+<div class="wrap">
+<header><h1>Why Your GPU Sits at 30% While Serving Requests</h1><p class="sub">A card at 30% is not a card you need to replace. It is a card waiting.</p></header>
+<section class="answer"><p class="kicker">In short</p><p class="stmt">Generation is memory-bandwidth bound, not compute bound. One request at a time leaves most of the card idle, and batching fixes that without buying hardware.</p></section>
+<section><h2>What that percentage is measuring</h2><p>Generation is memory-bandwidth bound, not compute bound. One request at a time leaves most of the card idle because the arithmetic units finish long before the weights arrive from memory.</p><p>That is why a 30% reading is not a hardware problem. The card has capacity; nothing is asking it to use that capacity. Batching converts headroom into throughput — the same weight matrix serves several requests in one pass instead of being read several times.</p></section>
+<section><h2>Static batching versus continuous batching</h2><p>Static batching waits for a full batch, runs it, waits again. Throughput improves, latency worsens, and the worst case is a short request stuck behind a long one for the whole batch duration.</p><p>Continuous batching admits new requests as slots free up at each decode step. That is the mechanism behind most of the throughput gains people attribute to &quot;a faster inference server&quot; — the scheduler is doing the work, not the kernel.</p><p>The cost is that latency becomes a distribution instead of a number. Measure the mean and batching looks free; measure p99 or you will ship a regression nobody reports until users say &quot;sometimes it hangs&quot;.</p></section>
+<section><h2>Where the bottleneck usually is</h2><table><thead><tr><th>Symptom</th><th>Likely cause</th><th>First thing to try</th></tr></thead><tbody><tr><td>GPU 25–35%, latency fine</td><td>No batching</td><td>Enable continuous batching</td></tr><tr><td>GPU high, latency high</td><td>Batch too large for the cache</td><td>Cap max batch, shorten context</td></tr><tr><td>GPU low, CPU high</td><td>Tokenisation on the hot path</td><td>Batch the tokeniser</td></tr><tr><td>Spiky utilisation</td><td>No admission control</td><td>Limit queue depth, shed load</td></tr></tbody></table></section>
+<section><h2>Measure these before changing anything</h2><ul class="bullets"><li>Tokens per second under steady load — not from a single curl.</li><li>Time to first token, separately from total time. Different causes, different fixes.</li><li>p50 and p99 latency at the concurrency you actually serve.</li><li>Queue depth over time. Flat means you are not the bottleneck; growing means you are.</li></ul></section>
+<section class="faq"><h2>Common questions</h2><details><summary>Does batching make every request slower?</summary><p>Slightly, yes — while total throughput rises a lot. That is the trade. If one user&#x27;s latency is a hard requirement, cap batch by size rather than by waiting for a full batch.</p></details><details><summary>Will a bigger GPU fix low utilisation?</summary><p>No — it lowers utilisation further. If the card is idle because nothing is scheduled on it, a bigger card is idle more expensively.</p></details><details><summary>Should I just raise max batch size?</summary><p>Only together with a KV cache calculation. Batch size multiplies cache usage, and the OOM that follows arrives under load — which makes it look like a stability problem instead of a sizing one.</p></details></section>
+<section><h2>A measurement pass that takes an hour</h2><ul class="bullets steps"><li><strong>Step 1.</strong> Load-test at the concurrency you expect, not at 1.</li><li><strong>Step 2.</strong> Record GPU utilisation, tokens per second, and p99 together.</li><li><strong>Step 3.</strong> If utilisation is under 50% with a flat queue, enable batching.</li><li><strong>Step 4.</strong> Re-measure p99 — if it moved more than you can accept, cap the batch instead of disabling batching.</li><li><strong>Step 5.</strong> Only then consider a larger card, and bring the numbers.</li></ul></section>
+<section class="related"><h2>Related reading</h2><ul><li><a href="./p/rag-vector-store-same-host-or-separate.html">RAG: Should the Vector Store Live on the Model Host?</a></li><li><a href="./p/how-much-vram-does-an-llm-need.html">How Much VRAM Does an LLM Actually Need?</a></li></ul></section>
+
+
+<footer>© 2026 · This site contains affiliate links; prices may change at any time.</footer>
+</div>
+</body>
+</html>
